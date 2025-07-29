@@ -1,0 +1,92 @@
+
+## archivos provienen de AFO
+ventas:
+  columns:
+    cod_cliente: str
+    nombre_cliente: str
+    cod_agente: str
+    cod_oficina: str
+    nombre_oficina: str
+    cod_canal_dist: str
+    nombre_canal_dist: str
+    cod_sub_canal_dist: str
+    nombre_sub_canal_dist: str
+  
+costo_merc_vend:
+  columns:
+    cod_oficina : str
+    nombre_oficina : str
+    cod_ramo: str
+    ramo: str
+    ingresos_totales: float
+    importe_moneda_grupo: float
+    untilidad_no_realizada: float
+
+facturas:
+  columns:
+    cod_cliente: str
+    cod_agente: str
+    num_facturas_acum: int64
+
+
+### ARCHIVOS PROVENIENTES DE EXCEL
+gastos:
+  usecols:
+    "C,G,H,J,L,M" # string con las columnas que se van a utilizar Cod.of, Cod_sub_canal, Importe, des_agrupa_costo
+  names:
+    - cod_oficina
+    - tipo_gasto
+    - cod_sub_canal
+    - gasto
+    - modelo_atencion
+    - agrupacion_costo
+  sheet_name: 
+    Hoja1
+  dtype:
+    cod_oficina : str
+    cod_sub_canal : str
+    gasto : float
+    modelo_atencion : str
+    agrupacion_costo : str
+
+    
+universo_directa:
+  usecols:
+    "B,W,AA" # string con las columnas que se van a utilizar para la maestras de clientes directa
+  names:
+    - cod_cliente
+    - funcion_in
+    - cod_visitas
+  sheet_name:
+    Clientes_Activos_AGCO
+    
+universo_indirecta:
+  usecols:
+    "B,D,R,S" # string con las columnas que se van a utilizar para la maestras de clientes directa
+  names:
+    - cod_agente
+    - cod_vendedor
+    - cod_visitas
+    - cod_cliente
+  sheet_name: 
+    Hoja1
+
+costo_por_minuto:
+  usecols:
+    "D,F,I,J,K"
+  names:
+    - cod_oficina
+    - modelo_atencion
+    - num_vendedores
+    - tiempo_promedio_atencion
+    - tiempo_promedio_entre_clientes
+  sheet_name:
+    hoja1
+
+  dtype:
+    cod_oficina: str
+    modelo_atencion: str
+    num_vendedores: float
+    tiempo_promedio_atencion: float
+    tiempo_promedio_entre_clientes: float
+
