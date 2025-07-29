@@ -1,6 +1,6 @@
 import yaml
 import os
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, List, Optional, Union, Any
 from loguru import logger
 import pandas as pd
 import time
@@ -120,3 +120,80 @@ class read_file:
             return True, "✅ Archivo cargado correctamente", file
         except Exception as e:
             return False, f"❌ Error al procesar archivo: {str(e)}", None
+        
+    
+def agrupa_df(
+    df: pd.DataFrame,
+    columnas_categoricas: List[str],
+    columnas_numericas: List[str],
+    operaciones: Union[List[str], Dict[str, Union[str, List[str]]]]
+    ) -> pd.DataFrame:
+    """
+    Agrupa un DataFrame con múltiples operaciones sobre columnas numéricas.
+
+    Parámetros:
+    - df: DataFrame original.
+    - columnas_categoricas: columnas por las que se agrupará.
+    - columnas_numericas: columnas numéricas sobre las que se aplicarán operaciones.
+    - operaciones: lista de operaciones (ej: ['sum', 'mean']) o un diccionario con columnas como claves y funciones como valores.
+
+    Retorna:
+    - DataFrame agrupado y con índice reseteado.
+    """
+    # Validaciones básicas
+    if isinstance(operaciones, list):
+        # Aplica mismas operaciones a todas las columnas numéricas
+        agg_dict = {col: operaciones for col in columnas_numericas}
+    elif isinstance(operaciones, dict):
+        agg_dict = operaciones
+    else:
+        raise ValueError("El parámetro 'operaciones' debe ser una lista o un diccionario.")
+    df_agrupado = df.groupby(columnas_categoricas).agg(agg_dict)
+    df_agrupado.columns = ['_'.join(col).strip() if isinstance(col, tuple) else col for col in df_agrupado.columns]
+    return df_agrupado.reset_index()
+
+
+
+def filtrar_dataframe(
+    df: pd.DataFrame,
+    filtros: Dict[str, Union[str, int, float, List[Union[str, int, float]]]],
+    modo: str = 'incluir'
+) -> pd.DataFrame:
+    """
+    Filtra un DataFrame según un diccionario de condiciones de inclusión o exclusión.
+
+    Parámetros:
+    - df: DataFrame a filtrar.
+    - filtros: Diccionario donde la clave es el nombre de la columna,
+               y el valor puede ser un único valor o una lista de valores.
+    - modo: 'incluir' para mantener los valores especificados,
+            'excluir' para eliminar los valores especificados.
+
+    Retorna:
+    - DataFrame filtrado.
+    """
+
+    if not isinstance(filtros, dict):
+        raise ValueError("El parámetro 'filtros' debe ser un diccionario.")
+
+    if modo not in ['incluir', 'excluir']:
+        raise ValueError("El parámetro 'modo' debe ser 'incluir' o 'excluir'.")
+
+    df_filtrado = df.copy()
+
+    for columna, valor in filtros.items():
+        if columna not in df_filtrado.columns:
+            raise KeyError(f"La columna '{columna}' no existe en el DataFrame.")
+
+        if isinstance(valor, list):
+            if modo == 'incluir':
+                df_filtrado = df_filtrado[df_filtrado[columna].isin(valor)]
+            else:
+                df_filtrado = df_filtrado[~df_filtrado[columna].isin(valor)]
+        else:
+            if modo == 'incluir':
+                df_filtrado = df_filtrado[df_filtrado[columna] == valor]
+            else:
+                df_filtrado = df_filtrado[df_filtrado[columna] != valor]
+
+    return df_filtrado.reset_index(drop=True)

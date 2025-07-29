@@ -13,3 +13,19 @@ anio_mes:
   - jun_2025
 
 
+columnas_calculadas:
+  cogs_anual :  porc_cogs * ventas_acumuladas
+  cogs_mensual : cogs_anual / conteo_meses
+  utilidad_bruta_anual: ventas_acumuladas - cogs_anual
+  utilidad_bruta_mensual : ventas_promedio - cogs_mensual
+  gas_x_otros_anual: porc_costo_x_otros * ventas_acumuladas
+  gas_x_otros_mensual:  porc_costo_x_otros * ventas_promedio
+  utilidad_operativa_anual: utilidad_bruta_anual - gas_x_otros_anual
+  utilidad_operativa_mensual : utilidad_bruta_mensual - gas_x_otros_mensual
+  visitas_x_mes:  num_visita_semana * 4.33
+  minutos_por_anio: 7*60*5*4.33*total_meses_analizado 
+  minutos_totales : tiempo_promedio_atencion+ tiempo_promedio_entre_clientes
+  costo_x_minuto : gasto_sum / num_vendedores / minutos_por_anio
+  costo_visita: costo_x_minuto*minutos_totales*visitas_x_mes
+  costo_fijo_entrega: ventas_acumuladas*porc_costo_fijo_entrega
+

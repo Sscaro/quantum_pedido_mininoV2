@@ -28,7 +28,6 @@ facturas:
     cod_agente: str
     num_facturas_acum: int64
 
-
 ### ARCHIVOS PROVENIENTES DE EXCEL
 gastos:
   usecols:
@@ -90,3 +89,175 @@ costo_por_minuto:
     tiempo_promedio_atencion: float
     tiempo_promedio_entre_clientes: float
 
+##-------------------------------------------------------------------||----------------------------------------------###
+###---------------------------- filtros--------------------------------###
+##-------------------------------------------------------------------||----------------------------------------------###
+filtros_func_in: # valores de los vendedores y jefes de ventas
+  - 'Z1'
+  - 'ZA'
+  - 'Z6'
+
+#filtros archivo ventas:
+filtros_archivo_ventas:
+    filtros_excluir:
+      cod_oficina: ['00']
+
+#filtros Modelo antencion
+filtros_modelo_directa:
+  modelo_atencion: 'Directa'
+filtros_modelo_indirecta:
+  modelo_atencion: 'Indirecta'
+
+
+### filtros archivos gastos por otros
+gastos_por_otros_directa:
+  filtros_excluir:
+    cod_oficina : ['10', '0','00']
+    cod_sub_canal : ['CC']       
+  filtros_incluir:
+    agrupacion_costo : ['Costo por otros']
+    modelo_atencion : ['Directa'] 
+
+
+gastos_por_otros_indirecta:
+  filtros_excluir:
+    cod_oficina : ['10', '0','00']
+    cod_sub_canal : ['CC']          
+  filtros_incluir:
+    agrupacion_costo : ['Costo por otros']
+    modelo_atencion : ['Indirecta']
+
+# filtros por gastos por visita
+gastos_visita:
+  filtros_excluir:
+    cod_oficina : ['10', '0','00']
+    cod_sub_canal : ['CC']          
+  filtros_incluir:
+    agrupacion_costo : ['Costo por visita']
+
+# filtros por gastos por entrega fijos
+gastos_entrega_fijos_directa:
+  filtros_excluir:
+    cod_oficina : ['10', '0','00']
+    cod_sub_canal : ['CC']       
+  filtros_incluir:
+    agrupacion_costo : ['Costo por entrega']
+    modelo_atencion : ['Directa'] 
+    tipo_gasto: ['Fijo']
+
+gastos_entrega_fijos_indirecta:
+  filtros_excluir:
+    cod_oficina : ['10', '0','00']
+    cod_sub_canal : ['CC']
+
+  filtros_incluir:
+    agrupacion_costo : ['Costo por entrega']
+    modelo_atencion : ['Indirecta']
+    tipo_gasto: ['Fijo']
+
+# filtros por gastos por entrega variable
+gastos_entrega_variable_directa:
+  filtros_excluir:
+    cod_oficina : ['10', '0','00']
+    cod_sub_canal : ['CC']       
+  filtros_incluir:
+    agrupacion_costo : ['Costo por entrega']
+    modelo_atencion : ['Directa'] 
+    tipo_gasto: ['Variable']
+
+
+gastos_entrega_variable_indirecta:
+  filtros_excluir:
+    cod_oficina : ['10', '0','00']
+    cod_sub_canal : ['CC']
+  filtros_incluir:
+    agrupacion_costo : ['Costo por entrega']
+    modelo_atencion : ['Indirecta']
+    tipo_gasto: ['Variable']
+
+
+##-------------------------------------------------------------------||----------------------------------------------###
+###---------------------------- relaciones--------------------------------###
+##-------------------------------------------------------------------||----------------------------------------------###
+merge_cxm:
+  left_on: ['cod_oficina','modelo_atencion']
+  right_on: ['cod_oficina','modelo_atencion']
+
+union_directa_cxo: ['cod_oficina','cod_sub_canal','modelo_atencion']
+union_indirecta_cxo: ['cod_oficina','modelo_atencion']
+union_gasto_visita: ['cod_oficina','modelo_atencion']
+
+merge_cxe:
+  left_on: ['cod_oficina','nueva_segmentacion']
+  right_on: ['cod_oficina','nueva_segmentacion']
+
+##-------------------------------------------------------------------||----------------------------------------------###
+###---------------------------- agrupaciones--------------------------------###
+##-------------------------------------------------------------------||----------------------------------------------###
+
+agrupa_vta_gxotro_directa:
+  categorias: ['cod_oficina','cod_sub_canal','modelo_atencion']
+  numericas: ['ventas_acumuladas']
+
+agrupa_vta_gxotro_indirecta:
+  categorias: ['cod_oficina','modelo_atencion']
+  numericas: ['ventas_acumuladas']
+
+agrupa_gastos_dir:
+  categorias: ['cod_oficina','cod_sub_canal','modelo_atencion']
+  numericas: ['gasto']
+
+agrupa_gastos_ind:
+  categorias: ['cod_oficina','modelo_atencion']
+  numericas: ['gasto']
+
+agrupa_gastos_visita: 
+  categorias: ['cod_oficina','modelo_atencion']
+  numericas: ['gasto']
+
+##-------------------------------------------------------------------||----------------------------------------------###
+###------------------------------------- Drivers para nueva segmentación------------------###
+##-------------------------------------------------------------------||----------------------------------------------###
+prioridad:
+  - condicion: "modelo_atencion == 'Indirecta'"
+    asignar: "I"
+  - condicion: "cod_sub_canal == 'CR'"
+    asignar: "CR"
+  - condicion: "cod_sub_canal == 'MY'"
+    asignar: "AM"
+  - condicion: "cod_canal=='T'"
+    asignar: "TI"
+default: "AM"
+
+##-------------------------------------------------------------------||----------------------------------------------###
+###------------------------------------- Formulas------------------###
+##-------------------------------------------------------------------||----------------------------------------------###
+columnas_calculadas:
+  cogs_anual :  porc_cogs * ventas_acumuladas
+  cogs_mensual : cogs_anual / conteo_meses
+  utilidad_bruta_anual: ventas_acumuladas - cogs_anual
+  utilidad_bruta_mensual : ventas_promedio - cogs_mensual
+  gas_x_otros_anual: porc_costo_x_otros * ventas_acumuladas
+  gas_x_otros_mensual:  porc_costo_x_otros * ventas_promedio
+  utilidad_operativa_anual: utilidad_bruta_anual - gas_x_otros_anual
+  utilidad_operativa_mensual : utilidad_bruta_mensual - gas_x_otros_mensual
+  visitas_x_mes:  num_visita_semana * 4.33
+  minutos_por_anio: 7*60*5*4.33*total_meses_analizado 
+  minutos_totales : tiempo_promedio_atencion+ tiempo_promedio_entre_clientes
+  costo_x_minuto : gasto_sum / num_vendedores / minutos_por_anio
+  costo_visita: costo_x_minuto*minutos_totales*visitas_x_mes
+  costo_fijo_entrega: ventas_acumuladas*porc_costo_fijo_entrega
+
+##-------------------------------------------------------------------||----------------------------------------------###
+###------------------------------------- columnas borrar------------------###
+##-------------------------------------------------------------------||----------------------------------------------###
+columnas_borrar:
+  - porc_cogs
+  - porc_costo_x_otros
+  - cod_ramo
+  - tiempo_promedio_atencion
+  - tiempo_promedio_entre_clientes
+  - gasto_sum
+  - num_vendedores
+  - minutos_por_anio
+  - porc_costo_fijo_entrega
