@@ -8,7 +8,7 @@ import time
 from typing import Dict, Any, Optional, Tuple
 from utils.utils import procesar_configuracion
 from utils.utils import read_file
-from utils.ventas import ajustar_archivo_afo
+from utils.ajustes_archivos import ajustar_archivo_afo, ajustes_archivo_universos
 
 ruta_config =  os.path.join(os.getcwd(),'config','config.yml') # archivo yml para configurar archivos de excel
 ruta_parametros = os.path.join(os.getcwd(),'config','params.yml') # parametros y valores constantes del breakeven
@@ -430,89 +430,88 @@ def main():
                         with col3:
                             memory_usage = df.memory_usage(deep=True).sum() / 1024 / 1024
                             st.metric("Memoria", f"{memory_usage:.1f} MB")
+                time.sleep(1)
+                st.rerun()
+                
+            if st.session_state.archivos_validados:
+                st.success("✅ Archivos validados correctamente")
 
-                
-                if 'calculo_completado' not in st.session_state:
-                    st.session_state.calculo_completado = False
-                if 'resultado_calculo' not in st.session_state:
-                    st.session_state.resultado_calculo = None
-                
-            calculo_disponible = all_valid and 'ventas' in st.session_state.dataframes
-                #procesar información.....
-            if st.button(
-                "🧮 Realizar Cálculos",
-                disabled=not calculo_disponible,
+            # Botón de cálculo (independiente del de validación)
+                           
+   
+    #procesar información.....
+        calculo_disponible = st.session_state.archivos_validados and 'ventas' in st.session_state.dataframes
+        if st.button(
+            "🧮 Realizar Cálculos",
+            disabled=not calculo_disponible or st.session_state.calculo_completado,
                 use_container_width=True,
-                type="primary" if calculo_disponible else "secondary"
-                ):
-                if calculo_disponible:
-                    try:
-                        st.info("🚀 Iniciando cálculo de workingbook...")                            
-                         # Contenedor para la barra de progreso
-                        calc_progress = st.progress(0)
-                        calc_status = st.empty()
-                        # Pasos del cálculo real
-                        calc_steps = [
-                            "Preparando datos de ventas...",
-                            "Aplicando transformaciones AFO...",
-                            "Calculando métricas de negocio...",
-                            "Procesando análisis temporal...",
-                            "Generando resultados finales..."
-                        ]
-                        # Realizar el cálculo real paso a paso
-                        for i, step in enumerate(calc_steps):
-                            calc_status.text(f"⚙️ {step}")
-                            calc_progress.progress((i + 1) / len(calc_steps))
-                            if i == 1:  # En el segundo paso, hacer el cálculo real
-                                data_ventas_ajustada = ajustar_archivo_afo(
-                                    st.session_state.dataframes['ventas'],
-                                    config,
-                                    parametros['anio_mes']
-                                )
-                                st.session_state.resultado_calculo = data_ventas_ajustada
-                            else:
-                                time.sleep(0.8)  # Simular tiempo de procesamiento
-                        calc_status.text("✅ ¡Cálculos completados exitosamente!")
-                        st.session_state.calculo_completado = True
-                        # Mostrar resumen de resultados
-                        st.success("🎉 Cálculos completados correctamente")
-                                    # Mostrar información del resultado
-                        
-                        if st.session_state.resultado_calculo is not None:
-                            resultado = st.session_state.resultado_calculo
-                            
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric("Filas Procesadas", f"{len(resultado):,}")
-                            with col2:
-                                st.metric("Columnas Generadas", len(resultado.columns))
-                            with col3:
-                                if 'total_ventas' in resultado.columns:
-                                    total_ventas = resultado['total_ventas'].sum()
-                                    st.metric("Total Ventas", f"${total_ventas:,.2f}")
-                            
-                            # Mostrar preview de resultados
-                            with st.expander("👀 Vista Previa de Resultados", expanded=True):
-                                st.dataframe(resultado.head(10), use_container_width=True)
-                    except Exception as e:
-                            st.error(f"❌ Error durante el cálculo: {str(e)}")
-                            st.session_state.calculo_completado = False
+                type="primary" if calculo_disponible and not st.session_state.calculo_completado else "secondary"
+            ):
+            if calculo_disponible:
+                try:
+                    st.info("🚀 Iniciando cálculo de workingbook...")                            
+                     # Contenedor para la barra de progreso
+                    calc_progress = st.progress(0)
+                    calc_status = st.empty()
+                    # Pasos del cálculo real
+                    calc_steps = [
+                        "Preparando datos de ventas...",
+                        "Aplicando transformaciones AFO...",
+                        "Calculando métricas de negocio...",
+                        "Procesando análisis temporal...",
+                        "Generando resultados finales..."
+                    ]
+                    # Realizar el cálculo real paso a paso
+                    for i, step in enumerate(calc_steps):
+                        calc_status.text(f"⚙️ {step}")
+                        calc_progress.progress((i + 1) / len(calc_steps))
+                        if i == 1:  # En el segundo paso, hacer el cálculo real
+                            data_ventas_ajustada = ajustar_archivo_afo(
+                                st.session_state.dataframes['ventas'],
+                                config,
+                                parametros['anio_mes']
+                            )
+                            st.session_state.resultado_calculo = data_ventas_ajustada
+                        else:
+                            time.sleep(0.8)  # Simular tiempo de procesamiento
+                    calc_status.text("✅ ¡Cálculos completados exitosamente!")
+                    st.session_state.calculo_completado = True
+                    # Mostrar resumen de resultados
+                    st.success("🎉 Cálculos completados correctamente")
+                                # Mostrar información del resultado
+
+                    if st.session_state.resultado_calculo is not None:
+                        resultado = st.session_state.resultado_calculo
+
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Filas Procesadas", f"{len(resultado):,}")
+                        with col2:
+                            st.metric("Columnas Generadas", len(resultado.columns))
+                        with col3:
+                            if 'total_ventas' in resultado.columns:
+                                total_ventas = resultado['total_ventas'].sum()
+                                st.metric("Total Ventas", f"${total_ventas:,.2f}")
+
+                        # Mostrar preview de resultados
+                        with st.expander("👀 Vista Previa de Resultados", expanded=True):
+                            st.dataframe(resultado.head(10), use_container_width=True)
+                except Exception as e:
+                        st.error(f"❌ Error durante el cálculo: {str(e)}")
+                        st.session_state.calculo_completado = False
             else:
                 st.warning("⚠️ Completa la carga de todos los archivos para continuar")
-
             st.markdown("---")
             # Botón de descarga (solo disponible después del cálculo)
             if st.session_state.calculo_completado and st.session_state.resultado_calculo is not None:
                 st.success("📁 Resultado listo para descarga")
-
                 # Preparar archivo para descarga
                 resultado = st.session_state.resultado_calculo
-
                 # Crear archivo Excel en memoria
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     resultado.to_excel(writer, sheet_name='Resultado', index=False)
-             
+
                 output.seek(0)
                 # Botón de descarga
                 st.download_button(
@@ -526,12 +525,12 @@ def main():
                 st.info("💡 Valida los archivos y realiza los cálculos para habilitar la descarga")
             else:
                 st.warning("⚠️ Carga todos los archivos requeridos para comenzar")
-        # Botón para limpiar datos
-        if st.button("🗑️ Limpiar Todos los Datos", use_container_width=True):
-            st.session_state.dataframes = {}
-            st.session_state.validation_status = {}
-            st.success("Datos limpiados correctamente")
-            st.rerun()
+            # Botón para limpiar datos
+            if st.button("🗑️ Limpiar Todos los Datos", use_container_width=True):
+                st.session_state.dataframes = {}
+                st.session_state.validation_status = {}
+                st.success("Datos limpiados correctamente")
+                st.rerun()
 
 if __name__ == "__main__":
     main()
