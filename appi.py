@@ -8,7 +8,7 @@ import time
 from typing import Dict, Any, Optional, Tuple
 from utils.utils import procesar_configuracion
 from utils.utils import read_file
-
+from utils.ventas import ajustar_archivo_afo
 
 ruta_config =  os.path.join(os.getcwd(),'config','config.yml') # archivo yml para configurar archivos de excel
 ruta_parametros = os.path.join(os.getcwd(),'config','params.yml') # parametros y valores constantes del breakeven
@@ -151,7 +151,7 @@ def procesar_archivo(file_key: str, file_path: str) -> Tuple[bool, str, Optional
         elif file_key == "costo_merc_vend":
             columnas_facturas = list(config['costo_merc_vend']['columns'].keys())
             lectura_archivos = read_file(file_path, 'xlsx')
-            return lectura_archivos.dfarchivoAFO(columnas_facturas, hoja_nombre='AFO', n=1, types=config[file_key]['columns'])
+            return lectura_archivos.dfarchivoAFO(columnas_facturas, hoja_nombre='AFO', n=2, types=config[file_key]['columns'])
         
         else:
             lectura_archivos = read_file(file_path, 'xlsx')
@@ -184,111 +184,94 @@ def main():
     file_configs = {
         'ventas': {
             'label': '📈 Carga Aqui archivos AFO Ventas',
-            'help': 'Archivo Excel con datos de ventas (fecha, producto, cantidad, precio_unitario, total)'
+            'help': 'Archivo Excel con datos de ventas (cod_cliente, Agente, canal, sub canal, meses...)'
         },
         'gastos': {
             'label': '💸 Carga aquí archivos de gasto',
-            'help': 'Archivo Excel con datos de gastos (fecha, categoria, descripcion, monto)'
+            'help': 'Archivo Excel con datos de gastos (cod_oficina, tipo gasto, sub canal, gasto, modelo atencion, agrupa costo)'
         },
         'facturas': {
             'label': '🧾 Carga aquí tus AFO de Facturas',
-            'help': 'Archivo Excel con datos de facturas (numero_factura, fecha_emision, cliente, subtotal, impuestos, total)'
+            'help': 'Archivo Excel con datos de facturas (cod_cliente, agente, num_facturas)'
         },
         'universo_directa': {
             'label': '📦 Carga aquí maestra de clientes directa',
-            'help': 'Archivo Excel con maestra de clientes directa (codigo_producto, nombre_producto, categoria, stock_actual, precio_compra, precio_venta)'
+            'help': 'Archivo Excel con maestra de clientes directa (cod_cliente, func_in, Num visitas)'
         },
         'universo_indirecta': {
             'label': '👥 Carga archivo universo de clientes Indirecta',
-            'help': 'Archivo Excel con datos de clientes indirecta (id_empleado, nombre_completo, departamento, salario, fecha_ingreso)'
+            'help': 'Archivo Excel con datos de clientes indirecta (cod_agente, cod_cliente, cod_vendedor, num_vistas)'
         },
         'costo_por_minuto': {
             'label': '⏱️ Carga archivo de costo por minuto',
-            'help': 'Archivo Excel con datos de costo por minuto (id_empleado, nombre_completo, departamento, salario, fecha_ingreso)'
+            'help': 'Archivo Excel con datos de costo por minuto (cod_oficina, modelo_atencion, num_vendedores, tiempo_prom_atencion, tiempo_prom_entre_cliente)'
         },
         'costo_merc_vend': {
             'label': '💰 Carga costo mercancia vendida',
-            'help': 'Archivo AFO costo mercancia vendida (id_empleado, nombre_completo, departamento, salario, fecha_ingreso)'
+            'help': 'Archivo AFO costo mercancia vendida (cod_oficina, cod_ramo, ingresos_totales)'
         }
     }
     
     # TAB 1: Carga manual de archivos
-    with tab1:
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.subheader("📁 Carga Manual de Archivos")
-            
-            # Crear sección para cada archivo
-            for file_key, file_info in file_configs.items():
-                with st.expander(file_info['label'], expanded=False):
-                    uploaded_file = st.file_uploader(
-                        f"Selecciona el archivo",
-                        type=['xlsx', 'xls'],
-                        key=f"file_{file_key}",
-                        help=file_info['help']
+    with tab1:    
+        st.subheader("📁 Carga Manual de Archivos")
+        # Crear sección para cada archivo
+        for file_key, file_info in file_configs.items():
+            with st.expander(file_info['label'], expanded=False):
+                uploaded_file = st.file_uploader(
+                    f"Selecciona el archivo",
+                    type=['xlsx', 'xls'],
+                    key=f"file_{file_key}",
+                    help=file_info['help']
                     )
                     
-                    if uploaded_file is not None:
-                        # Guardar archivo temporalmente
-                        temp_path = f"temp_{file_key}.xlsx"
-                        with open(temp_path, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
+                if uploaded_file is not None:
+                    # Guardar archivo temporalmente
+                    temp_path = f"temp_{file_key}.xlsx"
+                    with open(temp_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    is_valid, message, processed_df = procesar_archivo(file_key, temp_path)
+                                           
+                    # Mostrar el resultado
+                    if is_valid:
+                        st.success(message)
+                        st.session_state.dataframes[file_key] = processed_df
+                        st.session_state.validation_status[file_key] = True
                         
-                        is_valid, message, processed_df = procesar_archivo(file_key, temp_path)
-                                               
-                        # Mostrar el resultado
-                        if is_valid:
-                            st.success(message)
-                            st.session_state.dataframes[file_key] = processed_df
-                            st.session_state.validation_status[file_key] = True
-                            
-                            # Mostrar preview del DataFrame
-                            st.write("**Vista previa:**")
-                            st.dataframe(processed_df.head(3), use_container_width=True)
-                        else:
-                            st.error(message)
-                            st.session_state.validation_status[file_key] = False
-                            if file_key in st.session_state.dataframes:
-                                del st.session_state.dataframes[file_key]
-                            
-                            # Mostrar información esperada
-                            st.write("**Estructura esperada:**")
-                            expected_info = pd.DataFrame([
-                                {'Columna': col, 'Tipo': dtype} 
-                                for col, dtype in config[file_key]['columns'].items()
-                            ])
-                            st.dataframe(expected_info, use_container_width=True)
+                        # Mostrar preview del DataFrame
+                        st.write("**Vista previa:**")
+                        st.dataframe(processed_df.head(3), use_container_width=True)
                     else:
+                        st.error(message)
                         st.session_state.validation_status[file_key] = False
                         if file_key in st.session_state.dataframes:
                             del st.session_state.dataframes[file_key]
-        
-        with col2:
-            st.subheader("✅ Lista de Chequeo")
-            
-            # Mostrar estado de cada archivo
-            all_valid = True
-            for file_key, file_info in file_configs.items():
-                status = st.session_state.validation_status.get(file_key, False)
-                if status:
-                    st.success(f"✅ {file_key.replace('_', ' ').title()}")
+                        
+                        # Mostrar información esperada
+                        st.write("**Estructura esperada:**")
+                        expected_info = pd.DataFrame([
+                            {'Columna': col, 'Tipo': dtype} 
+                            for col, dtype in config[file_key]['columns'].items()
+                        ])
+                        st.dataframe(expected_info, use_container_width=True)
                 else:
-                    st.error(f"❌ {file_key.replace('_', ' ').title()}")
-                    all_valid = False
-            
-            st.markdown("---")
+                    st.session_state.validation_status[file_key] = False
+                    if file_key in st.session_state.dataframes:
+                        del st.session_state.dataframes[file_key]
+         
+          
             
             # Mostrar resumen
             loaded_count = sum(st.session_state.validation_status.values())
             total_count = len(file_configs)
             
-            st.metric(
-                label="Archivos Cargados",
-                value=f"{loaded_count}/{total_count}",
-                delta=f"{(loaded_count/total_count)*100:.0f}% completado"
-            )
-    
+        st.metric(
+            label="Archivos Cargados",
+            value=f"{loaded_count}/{total_count}",
+            delta=f"{(loaded_count/total_count)*100:.0f}% completado"
+        )
+        
     # TAB 2: Carga desde carpeta
     with tab2:
         st.subheader("📂 Carga Automática desde Carpeta")
@@ -403,14 +386,14 @@ def main():
         
         # Botón de cálculo mejorado
         if st.button(
-            "🚀 Iniciar Cálculo",
+            "🚀 Iniciar Validación archivos",
             disabled=not all_valid,
             use_container_width=True,
             type="primary" if all_valid else "secondary"
         ):
             if all_valid:
                 # Mostrar proceso de cálculo
-                st.success("¡Iniciando proceso de cálculo!")
+                st.success("¡Revisa el resumen de de los archivos cargados!")
                 
                 # Barra de progreso simulada
                 progress_bar = st.progress(0)
@@ -430,7 +413,7 @@ def main():
                 
                 for i, step in enumerate(steps):
                     status_text.text(f"⏳ {step}")
-                    time.sleep(0.5)  # Simular tiempo de procesamiento
+                    #time.sleep(0.5)  # Simular tiempo de procesamiento
                     progress_bar.progress((i + 1) / len(steps))
                 
                 status_text.text("✅ ¡Proceso completado!")
@@ -447,16 +430,108 @@ def main():
                         with col3:
                             memory_usage = df.memory_usage(deep=True).sum() / 1024 / 1024
                             st.metric("Memoria", f"{memory_usage:.1f} MB")
+
+                
+                if 'calculo_completado' not in st.session_state:
+                    st.session_state.calculo_completado = False
+                if 'resultado_calculo' not in st.session_state:
+                    st.session_state.resultado_calculo = None
+                
+            calculo_disponible = all_valid and 'ventas' in st.session_state.dataframes
+                #procesar información.....
+            if st.button(
+                "🧮 Realizar Cálculos",
+                disabled=not calculo_disponible,
+                use_container_width=True,
+                type="primary" if calculo_disponible else "secondary"
+                ):
+                if calculo_disponible:
+                    try:
+                        st.info("🚀 Iniciando cálculo de workingbook...")                            
+                         # Contenedor para la barra de progreso
+                        calc_progress = st.progress(0)
+                        calc_status = st.empty()
+                        # Pasos del cálculo real
+                        calc_steps = [
+                            "Preparando datos de ventas...",
+                            "Aplicando transformaciones AFO...",
+                            "Calculando métricas de negocio...",
+                            "Procesando análisis temporal...",
+                            "Generando resultados finales..."
+                        ]
+                        # Realizar el cálculo real paso a paso
+                        for i, step in enumerate(calc_steps):
+                            calc_status.text(f"⚙️ {step}")
+                            calc_progress.progress((i + 1) / len(calc_steps))
+                            if i == 1:  # En el segundo paso, hacer el cálculo real
+                                data_ventas_ajustada = ajustar_archivo_afo(
+                                    st.session_state.dataframes['ventas'],
+                                    config,
+                                    parametros['anio_mes']
+                                )
+                                st.session_state.resultado_calculo = data_ventas_ajustada
+                            else:
+                                time.sleep(0.8)  # Simular tiempo de procesamiento
+                        calc_status.text("✅ ¡Cálculos completados exitosamente!")
+                        st.session_state.calculo_completado = True
+                        # Mostrar resumen de resultados
+                        st.success("🎉 Cálculos completados correctamente")
+                                    # Mostrar información del resultado
+                        
+                        if st.session_state.resultado_calculo is not None:
+                            resultado = st.session_state.resultado_calculo
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("Filas Procesadas", f"{len(resultado):,}")
+                            with col2:
+                                st.metric("Columnas Generadas", len(resultado.columns))
+                            with col3:
+                                if 'total_ventas' in resultado.columns:
+                                    total_ventas = resultado['total_ventas'].sum()
+                                    st.metric("Total Ventas", f"${total_ventas:,.2f}")
+                            
+                            # Mostrar preview de resultados
+                            with st.expander("👀 Vista Previa de Resultados", expanded=True):
+                                st.dataframe(resultado.head(10), use_container_width=True)
+                    except Exception as e:
+                            st.error(f"❌ Error durante el cálculo: {str(e)}")
+                            st.session_state.calculo_completado = False
             else:
                 st.warning("⚠️ Completa la carga de todos los archivos para continuar")
-        
+
+            st.markdown("---")
+            # Botón de descarga (solo disponible después del cálculo)
+            if st.session_state.calculo_completado and st.session_state.resultado_calculo is not None:
+                st.success("📁 Resultado listo para descarga")
+
+                # Preparar archivo para descarga
+                resultado = st.session_state.resultado_calculo
+
+                # Crear archivo Excel en memoria
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    resultado.to_excel(writer, sheet_name='Resultado', index=False)
+             
+                output.seek(0)
+                # Botón de descarga
+                st.download_button(
+                    label="📥 Descargar Resultado Excel",
+                    data=output.getvalue(),
+                    file_name=f"resultado_breakeven.xlsx",           
+                    use_container_width=True,
+                    type="primary"
+                )
+            elif all_valid:
+                st.info("💡 Valida los archivos y realiza los cálculos para habilitar la descarga")
+            else:
+                st.warning("⚠️ Carga todos los archivos requeridos para comenzar")
         # Botón para limpiar datos
         if st.button("🗑️ Limpiar Todos los Datos", use_container_width=True):
             st.session_state.dataframes = {}
             st.session_state.validation_status = {}
             st.success("Datos limpiados correctamente")
             st.rerun()
-
 
 if __name__ == "__main__":
     main()
