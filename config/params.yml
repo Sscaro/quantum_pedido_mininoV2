@@ -12,6 +12,16 @@ anio_mes:
   - may_2025
   - jun_2025
 
+prioridad:
+  - condicion: "modelo_atencion == 'Indirecta'"
+    asignar: "I"
+  - condicion: "cod_sub_canal == 'CR'"
+    asignar: "CR"
+  - condicion: "cod_sub_canal == 'MY'"
+    asignar: "AM"
+  - condicion: "cod_canal=='T'"
+    asignar: "TI"
+default: "AM"
 
 columnas_calculadas:
   cogs_anual :  porc_cogs * ventas_acumuladas

@@ -6,9 +6,10 @@ import os
 import glob
 import time
 from typing import Dict, Any, Optional, Tuple
-from utils.utils import procesar_configuracion
+from utils.utils import procesar_configuracion, asignar_valor
 from utils.utils import read_file
-from utils.ajustes_archivos import ajustar_archivo_afo, ajustes_archivo_universos
+from utils.ajustes_archivo_ventas import ajustar_archivo_afo, ajustes_archivo_universos
+from utils.ajustes_archivo_gasto import configuracion_gastos
 
 ruta_config =  os.path.join(os.getcwd(),'config','config.yml') # archivo yml para configurar archivos de excel
 ruta_parametros = os.path.join(os.getcwd(),'config','params.yml') # parametros y valores constantes del breakeven
@@ -161,6 +162,28 @@ def procesar_archivo(file_key: str, file_path: str) -> Tuple[bool, str, Optional
         return False, f"❌ Error al procesar archivo: {str(e)}", None
 
 
+def guardar_excel_local(df: pd.DataFrame, nombre_archivo: str) -> bool:
+    """
+    Guarda el DataFrame en un archivo Excel en la raíz del proyecto
+    """
+    try:
+        ruta_archivo = os.path.join(os.getcwd(), nombre_archivo)
+        df.to_excel(ruta_archivo, index=False, engine='openpyxl')
+        return True, ruta_archivo
+    except Exception as e:
+        return False, str(e)
+
+
+def mostrar_info_dataframe(df: pd.DataFrame) -> str:
+    """
+    Captura la información del DataFrame como string
+    """
+    buffer = io.StringIO()
+    df.info(buf=buffer)
+    info_string = buffer.getvalue()
+    return info_string
+
+
 def main():
     st.set_page_config(
         page_title="Sistema Breakeven CN",
@@ -218,8 +241,7 @@ def main():
             'label': '💰 Carga costo mercancia vendida',
             'help': 'Archivo AFO costo mercancia vendida (cod_oficina, cod_ramo, ingresos_totales)'
         }
-    }
-    
+    }    
     # TAB 1: Carga manual de archivos
     with tab1:    
         st.subheader("📁 Carga Manual de Archivos")
@@ -270,9 +292,7 @@ def main():
                 else:
                     st.session_state.validation_status[file_key] = False
                     if file_key in st.session_state.dataframes:
-                        del st.session_state.dataframes[file_key]
-         
-          
+                        del st.session_state.dataframes[file_key]                 
             
         # Mostrar resumen
         loaded_count = sum(st.session_state.validation_status.values())
@@ -377,71 +397,9 @@ def main():
     with tab3:
         mostrar_editor_parametros()
     
-    # ÁREA PRINCIPAL PARA MOSTRAR RESULTADOS
-    if st.session_state.mostrar_resultado and st.session_state.resultado_calculo is not None:
-        st.markdown("---")
-        st.header("📊 Resultados del Análisis Breakeven")
-        
-        resultado = st.session_state.resultado_calculo
-        
-        # Métricas principales
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Filas Procesadas", f"{len(resultado):,}")
-        with col2:
-            st.metric("Columnas Generadas", len(resultado.columns))
-        with col3:
-            if 'ventas_acumuladas' in resultado.columns:
-                total_ventas = resultado['ventas_acumuladas'].sum()
-                st.metric("Total Ventas", f"${total_ventas:,.2f}")
-        with col4:
-            if 'ventas_promedio' in resultado.columns:
-                promedio_ventas = resultado['ventas_promedio'].mean()
-                st.metric("Promedio Ventas", f"${promedio_ventas:,.2f}")
-        
-        # Pestañas para organizar los resultados
-        result_tab1, result_tab2, result_tab3 = st.tabs(["📈 Vista Previa", "📊 Estadísticas", "💾 Descarga"])
-        
-        with result_tab1:
-            st.subheader("Vista Previa de Datos Procesados")
-            st.dataframe(resultado.head(20), use_container_width=True)
-        
-        with result_tab2:
-            st.subheader("Estadísticas Generales")
-            if 'ventas_acumuladas' in resultado.columns:
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.write("**Resumen de Ventas:**")
-                    st.write(resultado['ventas_acumuladas'].describe())
-                with col_b:
-                    if 'modelo_atencion' in resultado.columns:
-                        st.write("**Distribución por Modelo de Atención:**")
-                        distribucion = resultado['modelo_atencion'].value_counts()
-                        st.write(distribucion)
-        
-        with result_tab3:
-            st.subheader("Descargar Resultados")
-            st.info("💡 Los resultados están listos para descarga en formato Excel")
-            
-            # Crear archivo Excel en memoria
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                resultado.to_excel(writer, sheet_name='Resultado_Breakeven', index=False)
-            
-            output.seek(0)
-            
-            # Botón de descarga principal
-            st.download_button(
-                label="📥 Descargar Resultado Excel",
-                data=output.getvalue(),
-                file_name=f"resultado_breakeven_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                type="primary"
-            )
-            
-            st.success("✅ Archivo preparado para descarga")
+    st.markdown("---")
     
+                     
     # Panel lateral con estado general y botones de control
     with st.sidebar:
         st.header("📊 Panel de Control")
@@ -480,7 +438,6 @@ def main():
                     # Mostrar proceso de cálculo con status
                     with st.status("⚙️ Realizando cálculos...", expanded=True) as status:
                         st.write("Preparando datos de ventas...")
-                        time.sleep(0.8)
                         st.write("Aplicando transformaciones AFO...")
 
                         # Aquí se realiza el cálculo real
@@ -488,15 +445,31 @@ def main():
                             st.session_state.dataframes['ventas'],
                             config,
                             parametros['anio_mes']
-                        )                     
+                        ) 
+                        #asociando facturas              
+                        data_ventas_ajustada = data_ventas_ajustada.merge(st.session_state.dataframes['facturas'],
+                                                      on=list(config['facturas']['columns'].keys())[0:2], how='left')                        
+                        # añadiendo nueva segmentiación quantum
+                        data_ventas_ajustada['nueva_segmentacion'] = data_ventas_ajustada.apply(lambda row: asignar_valor(row, parametros['prioridad'], parametros['default']), axis=1)
+                        
+                        #leyendo archivo COGS:
+                        objeto_gastos = configuracion_gastos(config=config, 
+                                                             ventas=data_ventas_ajustada,
+                                                              gasto = st.session_state.dataframes['gastos']
+                                                             )
+                        data_cogs_ajustada = objeto_gastos.ajustar_archivo_cogs(st.session_state.dataframes['costo_merc_vend'])
+                        # Costopor_otros:
+                        costo_otros_dir  =  objeto_gastos.ajustes_gastos_por_otros(modelo='Directa')
+                        costo_otros_ind = objeto_gastos.ajustes_gastos_por_otros(modelo='Indirecta')
+
+                        #gastos por entrega fijos
+                        gastos_entrega_dir = objeto_gastos.ajus_gastos_entrega_fijos(modelo='Directa')
+                        gastos_entrega_ind = objeto_gastos.ajus_gastos_entrega_fijos(modelo='Indirecta')
+
                         st.session_state.resultado_calculo = data_ventas_ajustada
 
                         st.write("Calculando métricas de negocio...")
-                        time.sleep(0.8)
-                        st.write("Procesando análisis temporal...")
-                        time.sleep(0.8)
                         st.write("Generando resultados finales...")
-                        time.sleep(0.8)
 
                         status.update(label="✅ Cálculos completados exitosamente!", state="complete", expanded=False)
 
@@ -504,10 +477,6 @@ def main():
                     st.session_state.mostrar_resultado = True
 
                     st.success("🎉 Cálculos completados correctamente")
-                    st.info("📊 Los resultados se muestran en el área principal arriba")
-
-                    time.sleep(1)
-                    #st.rerun()
                     
                 except Exception as e:
                     st.error(f"❌ Error durante el cálculo: {str(e)}")
@@ -516,6 +485,26 @@ def main():
         # Mostrar estado del cálculo
         if st.session_state.calculo_completado:
             st.success("✅ Cálculos completados")
+
+                      # Crear tabla tipo df.info()
+            info_df = pd.DataFrame({
+                "Variable":  st.session_state.resultado_calculo.columns,
+                "Valores no nulos":  st.session_state.resultado_calculo.notnull().sum().values,
+                "Tipo de dato":  st.session_state.resultado_calculo.dtypes.astype(str).values
+            })
+
+            st.subheader("📋 Información del DataFrame")
+            st.dataframe(info_df, use_container_width=True)
+
+            # Botón para exportar a Excel
+            excel_buffer = io.BytesIO()
+            st.session_state.resultado_calculo.to_excel(excel_buffer, index=False)
+            st.download_button(
+                label="📥 Exportar a Excel",
+                data=excel_buffer.getvalue(),
+                file_name="resultado.xlsx"            
+                )
+
         elif st.session_state.archivos_validados:
             st.info("💡 Listo para realizar cálculos")     
         else:

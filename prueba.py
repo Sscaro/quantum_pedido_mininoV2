@@ -9,7 +9,7 @@ ruta_config =  os.path.join(os.getcwd(),'config','config.yml')
 config = procesar_configuracion(ruta_config)
 parametros = procesar_configuracion(ruta_parametros)
 
-print(list(parametros['anio_mes']))
+print(list(config['facturas']['columns'].keys())[0:2])
 #lectura_archivos = read_file(ruta_ventas,'xlsx')
 #lectura_archivos.dfarchivoAFO()
 

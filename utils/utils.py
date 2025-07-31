@@ -10,6 +10,7 @@ class DataProcessorError(Exception):
     pass
 
 
+
 def Registro_tiempo(original_func):
     # Decorador para registrar el tiempo de ejecución de una función.
     def wrapper(*args, **kwargs):
@@ -22,6 +23,22 @@ def Registro_tiempo(original_func):
         )
         return result
     return wrapper
+
+
+def asignar_valor(row, reglas, default):
+    '''
+    funcion para asginar la segmentación de los canales.
+    '''
+    for regla in reglas:
+        condicion = regla['condicion']
+        try:
+            if eval(f"row.{condicion}"):
+                return regla['asignar']
+        except Exception:
+            # Manejar errores en el eval (por ejemplo, columna faltante)
+            continue
+    return default
+
 
 def procesar_configuracion(nom_archivo_configuracion: Optional[str]) -> dict:
     """Lee un archivo YAML de configuración para un proyecto.
