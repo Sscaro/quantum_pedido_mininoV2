@@ -9,16 +9,10 @@ ruta_config =  os.path.join(os.getcwd(),'config','config.yml')
 config = procesar_configuracion(ruta_config)
 parametros = procesar_configuracion(ruta_parametros)
 
-
+print(list(parametros['anio_mes']))
 #lectura_archivos = read_file(ruta_ventas,'xlsx')
 #lectura_archivos.dfarchivoAFO()
 
-file = pd.ExcelFile(ruta_ventas)
-file = file.parse("AFO",dtype=str)
-file = file.loc[:,file.count() > 1] 
-
-file = file[2:] # Eliminar columnas vacías
-print(file.head())
 #file.columns = nombrecol
 #file = file[n:]
 #file = file.reset_index(drop=True

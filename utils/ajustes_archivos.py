@@ -46,27 +46,26 @@ def ajustar_archivo_afo(data: pd.DataFrame, config: dict, listado_mes: list):
     return df
     '''    
     #calcular modelo de atención y concatenar cod_cliente agente
-    try:
-        data['modelo_atencion'] = data[config['lista_columnas_afo'][0]].astype(str).str.startswith('8').map({True: 'Indirecta', False: 'Directa'})    # realizando tipado de las columnas de mes y reemplazos de valores 0 a nulos
+    data[listado_mes] = data[listado_mes].astype(float)
+    data['modelo_atencion'] = data[list(config['ventas']['columns'].keys())[0]].astype(str).str.startswith('8').map({True: 'Indirecta', False: 'Directa'})    # realizando tipado de las columnas de mes y reemplazos de valores 0 a nulos
+    #data[config['listo_meses_completos']] = data[config['listo_meses_completos']].astype(float)
 
-        #data[config['listo_meses_completos']] = data[config['listo_meses_completos']].astype(float)
-        data[listado_mes] = data[listado_mes].replace(0, np.nan)
-        #contando valores no nulos en las columnas.
-        data['conteo_meses'] = data[listado_mes].notna().sum(axis=1)
-        data['ultimo_mes_con_ventas'] = data.apply(obtener_ultimo_mes,axis=1,args=(listado_mes,))
-        data['ventas_acumuladas'] = data[listado_mes].sum(axis=1, skipna=True)
-        data['ventas_promedio'] = np.divide(
-                data['ventas_acumuladas'],
-                data['conteo_meses'],
-                out=np.zeros_like(data['ventas_acumuladas']),
-                where=data['conteo_meses'] != 0
-            )
-        data['total_meses_analizado'] = len(listado_mes)
+    data[listado_mes] = data[listado_mes].replace(0, np.nan)
+    #contando valores no nulos en las columnas.
+    print(data.info())
+    data['conteo_meses'] = data[listado_mes].notna().sum(axis=1)
+    data['ultimo_mes_con_ventas'] = data.apply(obtener_ultimo_mes,axis=1,args=(listado_mes,))
+    data['ventas_acumuladas'] = data[listado_mes].sum(axis=1, skipna=True)
+    data['ventas_promedio'] = np.divide(
+        data['ventas_acumuladas'],
+        data['conteo_meses'],
+        out=np.zeros_like(data['ventas_acumuladas']),
+        where=data['conteo_meses'] != 0
+        )
+    data['total_meses_analizado'] = len(listado_mes)
+    data  = filtrar_dataframe(data,config['filtros_archivo_ventas']['filtros_excluir'],modo='excluir')
+    return data
 
-        data  = filtrar_dataframe(data,config['filtros_archivo_ventas']['filtros_excluir'],modo='excluir')
-        return data
-    except Exception as e:
-        raise Exception(f"Error en ajustar_archivo_afo: {str(e)}")
 
 def ajustes_archivo_universos(df:pd.DataFrame,
                               columnas:list,
