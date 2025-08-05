@@ -3,7 +3,19 @@ import os
 from typing import Dict, List, Optional, Union, Any
 from loguru import logger
 import pandas as pd
+import numpy as np
 import time
+import re
+
+
+def limpiar_valor(valor):
+    if pd.isna(valor):
+        return np.nan
+    valor = str(valor)
+    # Reemplaza tabulaciones y múltiples espacios por un solo espacio
+    valor = re.sub(r'[\t\s]+', '', valor)
+    return valor
+
 
 class DataProcessorError(Exception):
     """Excepción personalizada para errores del DataProcessor"""
@@ -112,7 +124,7 @@ class read_file:
             return False, f"❌ Error al procesar archivo: {str(e)}", None
 
 
-    @Registro_tiempo
+    Registro_tiempo
     def dfarchivoAFO(self,nombrecol,
                      hoja_nombre = "AFO",
                      n=1,
@@ -214,3 +226,47 @@ def filtrar_dataframe(
                 df_filtrado = df_filtrado[df_filtrado[columna] != valor]
 
     return df_filtrado.reset_index(drop=True)
+
+'''
+Modulo para crear columnas calculadas
+'''
+
+class calculos_personalizados:
+
+    def __init__(self,dataframe,params):
+        '''
+        arg: data frame,
+            params
+        '''
+        
+        if not isinstance(dataframe, pd.DataFrame):
+            raise ValueError(f"El argumento no es un DataFrame") 
+        else:
+            self.dataframe = dataframe
+            self.params = params
+
+    def eliminar_columnas(self, columnas: List[str]):
+        '''
+        Funcion para eliminar columnas de un data frame
+        '''
+        for col in columnas:
+            try:
+                del self.dataframe[col]
+            except ValueError:
+                print(f'valor {col} no se elimino al no encontrase en el data frame')
+        return self.dataframe
+
+    def col_caluladas(self,nombre_diccionario:str):
+        '''
+            funcion para realizar diferentes calculo a un data frame
+        '''
+        if nombre_diccionario not in self.params .keys():
+            raise ValueError(f"no se encuentra {nombre_diccionario} en archivo de configuración") 
+        else:
+            columnas = self.params .get(nombre_diccionario, {})
+            for nueva_col, formula in columnas.items():
+                try:
+                    self.dataframe[nueva_col] = self.dataframe.eval(formula)
+                except Exception as e:
+                    raise ValueError(f"Error al calcular '{nueva_col}' con fórmula '{formula}': {e}")
+        return self.dataframe

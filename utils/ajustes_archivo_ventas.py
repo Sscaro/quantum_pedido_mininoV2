@@ -1,15 +1,8 @@
 import pandas as pd
 import numpy as np
 import re
-from utils.utils import filtrar_dataframe
+from utils.utils import filtrar_dataframe, limpiar_valor
 
-def limpiar_valor(valor):
-    if pd.isna(valor):
-        return np.nan
-    valor = str(valor)
-    # Reemplaza tabulaciones y múltiples espacios por un solo espacio
-    valor = re.sub(r'[\t\s]+', '', valor)
-    return valor
 
 def calcular_visitas_semana(cod):
     '''
@@ -52,7 +45,7 @@ def ajustar_archivo_afo(data: pd.DataFrame, config: dict, listado_mes: list):
 
     data[listado_mes] = data[listado_mes].replace(0, np.nan)
     #contando valores no nulos en las columnas.
-    print(data.info())
+    
     data['conteo_meses'] = data[listado_mes].notna().sum(axis=1)
     data['ultimo_mes_con_ventas'] = data.apply(obtener_ultimo_mes,axis=1,args=(listado_mes,))
     data['ventas_acumuladas'] = data[listado_mes].sum(axis=1, skipna=True)
@@ -64,44 +57,8 @@ def ajustar_archivo_afo(data: pd.DataFrame, config: dict, listado_mes: list):
         )
     data['total_meses_analizado'] = len(listado_mes)
     data  = filtrar_dataframe(data,config['filtros_archivo_ventas']['filtros_excluir'],modo='excluir')
+    print(data.info())
     return data
 
 
-def ajustes_archivo_universos(df:pd.DataFrame,
-                              columnas:list,
-                              filtros_adicionales: dict,
-                              tipo_universo: str = "Directa"):
-    '''
-    funcion para realizar ajustes de la maestra de la directa
-    ARG df: DataFrame
-        columnas: list Archivo de configuracion
-    '''
-    if  tipo_universo == 'Directa':
-        df[columnas[0]] = df[columnas[0]].astype(str).str.lstrip('0') # columnas[0] debe ser el cod cliente
-        df = df[df[columnas[1]].isin(filtros_adicionales['filtros_func_in'])]
-        df = df.drop_duplicates(keep='first')        
-     
-    df[columnas[2]] = df[columnas[2]].apply(limpiar_valor)
-    df[columnas[2]] = df[columnas[2]].replace('', np.nan)
-    df = df.fillna("-")
-    df[columnas[2]]= df[columnas[2]].apply(lambda x: str(x).upper())
-    df['num_visita_semana'] = df[columnas[2]].apply(calcular_visitas_semana)
-   
-    if tipo_universo == 'Directa':
-        df = df.groupby(df.columns[0],dropna=False)[df.columns[3]].sum().reset_index()  
-   
-    else:
-        # agrupación
-        df = df.groupby(list(df.columns[0:4:3]),dropna=False)[df.columns[4]].sum().reset_index()
-        df[df.columns[0]] = df[df.columns[0]]+df[df.columns[1]]  
-    return df
 
-def concatenar_df(*dfs,ignore_index=True):
-    '''
-    funcion para concatenar data frames
-    '''
-    for i, df in enumerate(dfs):
-        if not isinstance(df, pd.DataFrame):
-            raise ValueError(f"El argumento número {i+1} no es un DataFrame") 
-    
-    return pd.concat(dfs, ignore_index=ignore_index)

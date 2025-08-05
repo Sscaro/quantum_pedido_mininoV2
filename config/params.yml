@@ -39,3 +39,13 @@ columnas_calculadas:
   costo_visita: costo_x_minuto*minutos_totales*visitas_x_mes
   costo_fijo_entrega: ventas_acumuladas*porc_costo_fijo_entrega
 
+columnas_borrar:
+  - porc_cogs
+  - porc_costo_x_otros
+  - cod_ramo
+  - tiempo_promedio_atencion
+  - tiempo_promedio_entre_clientes
+  - gasto_sum
+  - num_vendedores
+  - minutos_por_anio
+  - porc_costo_fijo_entrega

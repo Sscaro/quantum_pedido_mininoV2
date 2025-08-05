@@ -9,7 +9,7 @@ ventas:
     nombre_oficina: str
     cod_canal_dist: str
     nombre_canal_dist: str
-    cod_sub_canal_dist: str
+    cod_sub_canal: str
     nombre_sub_canal_dist: str
   
 costo_merc_vend:
@@ -80,14 +80,27 @@ costo_por_minuto:
     - tiempo_promedio_atencion
     - tiempo_promedio_entre_clientes
   sheet_name:
-    hoja1
-
+    costo_x_minuto_visita
   dtype:
     cod_oficina: str
     modelo_atencion: str
     num_vendedores: float
     tiempo_promedio_atencion: float
     tiempo_promedio_entre_clientes: float
+
+costo_minuto_x_entrega:
+  usecols:
+    "A,B,C"
+  names:
+    - cod_oficina
+    - nueva_segmentacion
+    - tiempo_entrega
+  sheet_name:
+    costo_minuto_entrega
+  dtype:
+    cod_oficina: str
+    nueva_segmentacion: str
+    tiempo_entrega: float
 
 ##-------------------------------------------------------------------||----------------------------------------------###
 ###---------------------------- filtros--------------------------------###
@@ -103,29 +116,29 @@ filtros_archivo_ventas:
       cod_oficina: ['00']
 
 #filtros Modelo antencion
-filtros_modelo_directa:
-  modelo_atencion: 'Directa'
-filtros_modelo_indirecta:
-  modelo_atencion: 'Indirecta'
+filtros:
+  directa:
+    modelo_atencion: 'Directa'
+  indirecta:
+    modelo_atencion: 'Indirecta'
 
 
 ### filtros archivos gastos por otros
-gastos_por_otros_directa:
-  filtros_excluir:
-    cod_oficina : ['10', '0','00']
-    cod_sub_canal : ['CC']       
-  filtros_incluir:
-    agrupacion_costo : ['Costo por otros']
-    modelo_atencion : ['Directa'] 
-
-
-gastos_por_otros_indirecta:
-  filtros_excluir:
-    cod_oficina : ['10', '0','00']
-    cod_sub_canal : ['CC']          
-  filtros_incluir:
-    agrupacion_costo : ['Costo por otros']
-    modelo_atencion : ['Indirecta']
+gastos_por_otros:  
+  directa:
+    filtros_excluir:
+      cod_oficina : ['10', '0','00']
+      cod_sub_canal : ['CC']       
+    filtros_incluir:
+      agrupacion_costo : ['Costo por otros']
+      modelo_atencion : ['Directa'] 
+  indirecta:
+    filtros_excluir:
+      cod_oficina : ['10', '0','00']
+      cod_sub_canal : ['CC']          
+    filtros_incluir:
+      agrupacion_costo : ['Costo por otros']
+      modelo_atencion : ['Indirecta']
 
 # filtros por gastos por visita
 gastos_visita:
@@ -136,44 +149,45 @@ gastos_visita:
     agrupacion_costo : ['Costo por visita']
 
 # filtros por gastos por entrega fijos
-gastos_entrega_fijos_directa:
-  filtros_excluir:
-    cod_oficina : ['10', '0','00']
-    cod_sub_canal : ['CC']       
-  filtros_incluir:
-    agrupacion_costo : ['Costo por entrega']
-    modelo_atencion : ['Directa'] 
-    tipo_gasto: ['Fijo']
 
-gastos_entrega_fijos_indirecta:
-  filtros_excluir:
-    cod_oficina : ['10', '0','00']
-    cod_sub_canal : ['CC']
-
-  filtros_incluir:
-    agrupacion_costo : ['Costo por entrega']
-    modelo_atencion : ['Indirecta']
-    tipo_gasto: ['Fijo']
+gastos_entrega_fijos:
+  directa:
+    filtros_excluir:
+      cod_oficina : ['10', '0','00']
+      cod_sub_canal : ['CC']       
+    filtros_incluir:
+      agrupacion_costo : ['Costo por entrega']
+      modelo_atencion : ['Directa'] 
+      tipo_gasto: ['Fijo']
+  indirecta:
+    filtros_excluir:
+      cod_oficina : ['10', '0','00']
+      cod_sub_canal : ['CC']
+    filtros_incluir:
+      agrupacion_costo : ['Costo por entrega']
+      modelo_atencion : ['Indirecta']
+      tipo_gasto: ['Fijo']
 
 # filtros por gastos por entrega variable
-gastos_entrega_variable_directa:
-  filtros_excluir:
-    cod_oficina : ['10', '0','00']
-    cod_sub_canal : ['CC']       
-  filtros_incluir:
-    agrupacion_costo : ['Costo por entrega']
-    modelo_atencion : ['Directa'] 
-    tipo_gasto: ['Variable']
+gastos_entrega_variable:
+  directa:
+    filtros_excluir:
+      cod_oficina : ['10', '0','00']
+      cod_sub_canal : ['CC']       
+    filtros_incluir:
+      agrupacion_costo : ['Costo por entrega']
+      modelo_atencion : ['Directa'] 
+      tipo_gasto: ['Variable']
+  indirecta: 
+    filtros_excluir:
+      cod_oficina : ['10', '0','00']
+      cod_sub_canal : ['CC']
+    filtros_incluir:
+      agrupacion_costo : ['Costo por entrega']
+      modelo_atencion : ['Indirecta']
+      tipo_gasto: ['Variable']
 
 
-gastos_entrega_variable_indirecta:
-  filtros_excluir:
-    cod_oficina : ['10', '0','00']
-    cod_sub_canal : ['CC']
-  filtros_incluir:
-    agrupacion_costo : ['Costo por entrega']
-    modelo_atencion : ['Indirecta']
-    tipo_gasto: ['Variable']
 
 
 ##-------------------------------------------------------------------||----------------------------------------------###
@@ -183,8 +197,10 @@ merge_cxm:
   left_on: ['cod_oficina','modelo_atencion']
   right_on: ['cod_oficina','modelo_atencion']
 
-union_directa_cxo: ['cod_oficina','cod_sub_canal','modelo_atencion']
-union_indirecta_cxo: ['cod_oficina','modelo_atencion']
+union_cxo:
+  directa: ['cod_oficina','cod_sub_canal','modelo_atencion']
+  indirecta: ['cod_oficina','modelo_atencion']
+
 union_gasto_visita: ['cod_oficina','modelo_atencion']
 
 merge_cxe:
@@ -195,21 +211,21 @@ merge_cxe:
 ###---------------------------- agrupaciones--------------------------------###
 ##-------------------------------------------------------------------||----------------------------------------------###
 
-agrupa_vta_gxotro_directa:
-  categorias: ['cod_oficina','cod_sub_canal','modelo_atencion']
-  numericas: ['ventas_acumuladas']
+agrupa_vta_gxotro:
+  directa:
+    categorias: ['cod_oficina','cod_sub_canal','modelo_atencion']
+    numericas: ['ventas_acumuladas']
+  indirecta:
+    categorias: ['cod_oficina','modelo_atencion']
+    numericas: ['ventas_acumuladas']
 
-agrupa_vta_gxotro_indirecta:
-  categorias: ['cod_oficina','modelo_atencion']
-  numericas: ['ventas_acumuladas']
-
-agrupa_gastos_dir:
-  categorias: ['cod_oficina','cod_sub_canal','modelo_atencion']
-  numericas: ['gasto']
-
-agrupa_gastos_ind:
-  categorias: ['cod_oficina','modelo_atencion']
-  numericas: ['gasto']
+agrupa_gastos:
+  directa:
+    categorias: ['cod_oficina','cod_sub_canal','modelo_atencion']
+    numericas: ['gasto']
+  indirecta:
+    categorias: ['cod_oficina','modelo_atencion']
+    numericas: ['gasto']
 
 agrupa_gastos_visita: 
   categorias: ['cod_oficina','modelo_atencion']

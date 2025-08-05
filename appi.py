@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import tempfile
 import yaml
 import io
 import os
@@ -7,9 +8,10 @@ import glob
 import time
 from typing import Dict, Any, Optional, Tuple
 from utils.utils import procesar_configuracion, asignar_valor
-from utils.utils import read_file
-from utils.ajustes_archivo_ventas import ajustar_archivo_afo, ajustes_archivo_universos
+from utils.utils import read_file, calculos_personalizados
+from utils.ajustes_archivo_ventas import ajustar_archivo_afo
 from utils.ajustes_archivo_gasto import configuracion_gastos
+from utils.ajustes_universos import ajustes_archivo_maestra_directa, ajustes_archivo_universos_indirecta
 
 ruta_config =  os.path.join(os.getcwd(),'config','config.yml') # archivo yml para configurar archivos de excel
 ruta_parametros = os.path.join(os.getcwd(),'config','params.yml') # parametros y valores constantes del breakeven
@@ -48,7 +50,6 @@ def cargar_archivos_desde_carpeta(folder_path: str) -> Dict[str, Any]:
         st.error(f"Error al cargar archivos desde carpeta: {str(e)}")
         return {}
 
-
 def guardar_parametros(parametros_actualizados: Dict[str, Any]) -> bool:
     """
     Guarda los parámetros actualizados en el archivo params.yml
@@ -60,7 +61,6 @@ def guardar_parametros(parametros_actualizados: Dict[str, Any]) -> bool:
     except Exception as e:
         st.error(f"Error al guardar parámetros: {str(e)}")
         return False
-
 
 def mostrar_editor_parametros():
     """
@@ -89,7 +89,7 @@ def mostrar_editor_parametros():
             if nuevo_mes.strip():
                 meses_editados.append(nuevo_mes.strip())
         
-        # Opción para agregar nuevo mes
+        #Opción para agregar nuevo mes
         nuevo_mes = st.text_input("Agregar nuevo mes:", key="nuevo_mes_input")
         if st.button("➕ Agregar Mes") and nuevo_mes.strip():
             meses_editados.append(nuevo_mes.strip())
@@ -115,7 +115,6 @@ def mostrar_editor_parametros():
     
     # Botones de acción
     col_save, col_cancel = st.columns(2)
-    
     with col_save:
         if st.button("💾 Guardar Cambios", type="primary", use_container_width=True):
             if guardar_parametros(st.session_state.parametros_editados):
@@ -132,7 +131,6 @@ def mostrar_editor_parametros():
         if st.button("❌ Cancelar Cambios", use_container_width=True):
             st.session_state.parametros_editados = parametros.copy()
             st.rerun()
-
 
 def procesar_archivo(file_key: str, file_path: str) -> Tuple[bool, str, Optional[pd.DataFrame]]:
     """
@@ -153,14 +151,13 @@ def procesar_archivo(file_key: str, file_path: str) -> Tuple[bool, str, Optional
             columnas_facturas = list(config['costo_merc_vend']['columns'].keys())
             lectura_archivos = read_file(file_path, 'xlsx')
             return lectura_archivos.dfarchivoAFO(columnas_facturas, hoja_nombre='AFO', n=2, types=config[file_key]['columns'])
-        
+             
         else:
             lectura_archivos = read_file(file_path, 'xlsx')
             return lectura_archivos.leer_excel(config[file_key])
     
     except Exception as e:
         return False, f"❌ Error al procesar archivo: {str(e)}", None
-
 
 def guardar_excel_local(df: pd.DataFrame, nombre_archivo: str) -> bool:
     """
@@ -172,8 +169,6 @@ def guardar_excel_local(df: pd.DataFrame, nombre_archivo: str) -> bool:
         return True, ruta_archivo
     except Exception as e:
         return False, str(e)
-
-
 def mostrar_info_dataframe(df: pd.DataFrame) -> str:
     """
     Captura la información del DataFrame como string
@@ -183,7 +178,6 @@ def mostrar_info_dataframe(df: pd.DataFrame) -> str:
     info_string = buffer.getvalue()
     return info_string
 
-
 def main():
     st.set_page_config(
         page_title="Sistema Breakeven CN",
@@ -192,8 +186,7 @@ def main():
     )
     
     st.title("📊 Sistema Actualización breakeven CN")
-    st.markdown("---")
-    
+    st.markdown("---") 
     # Inicializar session state
     if 'dataframes' not in st.session_state:
         st.session_state.dataframes = {}
@@ -237,6 +230,12 @@ def main():
             'label': '⏱️ Carga archivo de costo por minuto',
             'help': 'Archivo Excel con datos de costo por minuto (cod_oficina, modelo_atencion, num_vendedores, tiempo_prom_atencion, tiempo_prom_entre_cliente)'
         },
+        'costo_minuto_x_entrega': {
+            'label': '⏱️ Carga archivo de costo por minut por entrega',
+            'help': 'Archivo Excel con datos de costo por minuto (cod_oficina, nueva_segmentacion, tiempo_entrega)'
+        },
+        
+
         'costo_merc_vend': {
             'label': '💰 Carga costo mercancia vendida',
             'help': 'Archivo AFO costo mercancia vendida (cod_oficina, cod_ramo, ingresos_totales)'
@@ -256,13 +255,15 @@ def main():
                     )
                     
                 if uploaded_file is not None:
-                    # Guardar archivo temporalmente
+                    #Guardar archivo temporalmente
+                  # Guardar archivo temporalmente
                     temp_path = f"temp_{file_key}.xlsx"
                     with open(temp_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
-                    
-                    is_valid, message, processed_df = procesar_archivo(file_key, temp_path)
-                                           
+    
+                    is_valid, message, processed_df = procesar_archivo(file_key, temp_path)                   
+                   
+                                
                     # Mostrar el resultado
                     if is_valid:
                         st.success(message)
@@ -426,7 +427,9 @@ def main():
         
         # Botón de cálculo (independiente del de validación)
         calculo_disponible = 'ventas' in st.session_state.dataframes
-        
+        '''
+        Desde este script se comienzan con los calculos respectivos del caclulo del breakeven.
+        '''
         if st.button(
             "🧮 Realizar Cálculos",
             disabled=not calculo_disponible or st.session_state.calculo_completado,
@@ -434,53 +437,123 @@ def main():
             type="primary" if calculo_disponible and not st.session_state.calculo_completado else "secondary"
         ):
             if calculo_disponible:
-                try:
-                    # Mostrar proceso de cálculo con status
-                    with st.status("⚙️ Realizando cálculos...", expanded=True) as status:
-                        st.write("Preparando datos de ventas...")
-                        st.write("Aplicando transformaciones AFO...")
-
-                        # Aquí se realiza el cálculo real
-                        data_ventas_ajustada = ajustar_archivo_afo(
-                            st.session_state.dataframes['ventas'],
-                            config,
-                            parametros['anio_mes']
-                        ) 
-                        #asociando facturas              
-                        data_ventas_ajustada = data_ventas_ajustada.merge(st.session_state.dataframes['facturas'],
-                                                      on=list(config['facturas']['columns'].keys())[0:2], how='left')                        
-                        # añadiendo nueva segmentiación quantum
-                        data_ventas_ajustada['nueva_segmentacion'] = data_ventas_ajustada.apply(lambda row: asignar_valor(row, parametros['prioridad'], parametros['default']), axis=1)
-                        
-                        #leyendo archivo COGS:
-                        objeto_gastos = configuracion_gastos(config=config, 
-                                                             ventas=data_ventas_ajustada,
-                                                              gasto = st.session_state.dataframes['gastos']
-                                                             )
-                        data_cogs_ajustada = objeto_gastos.ajustar_archivo_cogs(st.session_state.dataframes['costo_merc_vend'])
-                        # Costopor_otros:
-                        costo_otros_dir  =  objeto_gastos.ajustes_gastos_por_otros(modelo='Directa')
-                        costo_otros_ind = objeto_gastos.ajustes_gastos_por_otros(modelo='Indirecta')
-
-                        #gastos por entrega fijos
-                        gastos_entrega_dir = objeto_gastos.ajus_gastos_entrega_fijos(modelo='Directa')
-                        gastos_entrega_ind = objeto_gastos.ajus_gastos_entrega_fijos(modelo='Indirecta')
-
-                        st.session_state.resultado_calculo = data_ventas_ajustada
-
-                        st.write("Calculando métricas de negocio...")
-                        st.write("Generando resultados finales...")
-
-                        status.update(label="✅ Cálculos completados exitosamente!", state="complete", expanded=False)
-
-                    st.session_state.calculo_completado = True
-                    st.session_state.mostrar_resultado = True
-
-                    st.success("🎉 Cálculos completados correctamente")
+                #try:
+                # Mostrar proceso de cálculo con status
+                with st.status("⚙️ Realizando cálculos...", expanded=True) as status:
+                    st.write("Preparando datos de ventas...")
+                    st.write("Aplicando transformaciones AFO...")
+                    # Aquí se realiza el cálculo real
+                    data_ventas_ajustada = ajustar_archivo_afo(
+                        st.session_state.dataframes['ventas'],
+                        config,
+                        parametros['anio_mes']
+                    ) 
+                    #asociando facturas              
+                    data_ventas_ajustada = data_ventas_ajustada.merge(st.session_state.dataframes['facturas'],
+                                                  on=list(config['facturas']['columns'].keys())[0:2], how='left')                        
+                    # añadiendo nueva segmentiación quantum
+                    data_ventas_ajustada['nueva_segmentacion'] = data_ventas_ajustada.apply(lambda row: asignar_valor(row, parametros['prioridad'], parametros['default']), axis=1)
                     
-                except Exception as e:
-                    st.error(f"❌ Error durante el cálculo: {str(e)}")
-                    st.session_state.calculo_completado = False
+                    #leyendo archivo COGS:
+                    objeto_gastos = configuracion_gastos(config=config, 
+                                                         ventas=data_ventas_ajustada,
+                                                          gasto = st.session_state.dataframes['gastos']
+                                                         )
+                    data_cogs_ajustada = objeto_gastos.ajustar_archivo_cogs(st.session_state.dataframes['costo_merc_vend'])
+                    # Costo_por_otros:
+                    costo_otros_dir  =  objeto_gastos.ajustes_gastos_por_otros(modelo='directa')
+                    costo_otros_ind = objeto_gastos.ajustes_gastos_por_otros(modelo='indirecta')
+                    #gastos por entrega fijos
+                    gastos_entrega_dir = objeto_gastos.ajus_gastos_entrega_fijos(modelo='directa')
+                    gastos_entrega_ind = objeto_gastos.ajus_gastos_entrega_fijos(modelo='indirecta')
+
+                    gastos_entrega_var_dir= objeto_gastos.ajus_gastos_entrega_variable(modelo='directa')
+                    gastos_entrega_var_ind= objeto_gastos.ajus_gastos_entrega_variable(modelo='indirecta')
+                    
+                    data_ventas_ajustada = data_ventas_ajustada.merge(data_cogs_ajustada,left_on=[list(config['ventas']['columns'].keys())[3],
+                                                                                                  list(config['ventas']['columns'].keys())[7]],
+                                                      right_on=[list(config['costo_merc_vend']['columns'].keys())[0],
+                                                                list(config['costo_merc_vend']['columns'].keys())[2]],
+                                                        how = 'left')
+                    
+                    # cruce gastos modelo atencion directa
+                    data_ventas_ajustada_directa  = data_ventas_ajustada[data_ventas_ajustada['modelo_atencion']=='Directa']          
+                    data_ventas_ajustada_directa = data_ventas_ajustada_directa.merge(
+                                                                costo_otros_dir, on =config['agrupa_vta_gxotro']['directa']['categorias'],   
+                                                                how='left')
+                    data_ventas_ajustada_directa = data_ventas_ajustada_directa.merge(
+                                                                gastos_entrega_dir, on =config['agrupa_vta_gxotro']['directa']['categorias'],       
+                                                                how='left')
+                    data_ventas_ajustada_directa = data_ventas_ajustada_directa.merge(gastos_entrega_var_dir, on =config['agrupa_vta_gxotro']['directa']['categorias'],
+                                                                        how='left')
+                     # Ajustes relaciones modelo de atención Indirecta.
+                    data_ventas_ajustada_indirecta  = data_ventas_ajustada[data_ventas_ajustada['modelo_atencion']=='Indirecta']
+                    data_ventas_ajustada_indirecta = data_ventas_ajustada_indirecta.merge(
+                                                                                costo_otros_ind, on =config['agrupa_vta_gxotro']['indirecta']['categorias'],
+                                                                                how='left')
+                    data_ventas_ajustada_indirecta = data_ventas_ajustada_indirecta.merge(
+                                                                                gastos_entrega_ind, on =config['agrupa_vta_gxotro']['indirecta']['categorias'],
+                                                                                how='left')
+                    data_ventas_ajustada_indirecta = data_ventas_ajustada_indirecta.merge(gastos_entrega_var_ind, on =config['agrupa_vta_gxotro']['indirecta']['categorias'],
+                                                                                        how='left')
+
+                               
+                    #concatena ambos modelos Directa e indirecta
+                                      #___relacionando universos con ventas___
+                    maestra_directa = ajustes_archivo_maestra_directa(st.session_state.dataframes['universo_directa'], config)
+                    #cruce de información universos con ventas
+                    universo_indirecta = ajustes_archivo_universos_indirecta(st.session_state.dataframes['universo_indirecta'], config)
+                    data_ventas_ajustada_directa = data_ventas_ajustada_directa.merge(
+                        maestra_directa,
+                        left_on=list(config['ventas']['columns'].keys())[0],
+                        right_on=config['universo_directa']['names'][0],
+                        how='left')
+                     #cruce de información universos indicra
+                    data_ventas_ajustada_indirecta = data_ventas_ajustada_indirecta.merge(
+                        universo_indirecta,
+                        left_on=(list(config['ventas']['columns'].keys())[0],list(config['ventas']['columns'].keys())[2]),
+                        right_on=(config['universo_indirecta']['names'][3],config['universo_indirecta']['names'][0]),
+                        how='left')
+
+                    data_ventas_ajustada =  pd.concat([data_ventas_ajustada_directa,data_ventas_ajustada_indirecta])
+                    
+                    ### gasto por visita
+
+
+
+                    gasto_visita = objeto_gastos.ajus_gastos_visita(st.session_state.dataframes['costo_por_minuto'])   
+                    data_ventas_ajustada = data_ventas_ajustada.merge(
+                        gasto_visita,
+                        left_on=config['merge_cxm']['left_on'],
+                        right_on=config['merge_cxm']['right_on'],
+                        how='left')
+
+                    #leyendo archivo de minutos por entrega
+
+                    #cruce costo por minuto entrega
+                    data_ventas_ajustada = data_ventas_ajustada.merge(
+                        st.session_state.dataframes['costo_minuto_x_entrega'],
+                        left_on=config['merge_cxe']['left_on'],
+                        right_on=config['merge_cxe']['right_on'],
+                        how='left')
+
+                    calculando = calculos_personalizados(data_ventas_ajustada, parametros)
+                    data_con_calculos = calculando.col_caluladas('columnas_calculadas')
+                    data_con_calculos = calculando.eliminar_columnas(parametros['columnas_borrar'])                
+
+
+                    st.session_state.resultado_calculo = data_con_calculos
+                    st.write("Calculando métricas de negocio...")
+                    st.write("Generando resultados finales...")
+                    status.update(label="✅ Cálculos completados exitosamente!", state="complete", expanded=False)
+                
+                st.session_state.calculo_completado = True
+                st.session_state.mostrar_resultado = True
+                st.success("🎉 Cálculos completados correctamente")
+                    
+                #except Exception as e:
+                #    st.error(f"❌ Error durante el cálculo: {str(e)}")
+                #    st.session_state.calculo_completado = False
         
         # Mostrar estado del cálculo
         if st.session_state.calculo_completado:
